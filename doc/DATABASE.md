@@ -320,6 +320,31 @@ DATABASE_MAX_LIFETIME_SECONDS=1800   # recycle a pooled connection after this lo
 DATABASE_APPLICATION_NAME=paperclip  # application_name in pg_stat_activity; default: paperclip
 ```
 
+### Bounded response diagnostics
+
+`PAPERCLIP_DB_RESPONSE_CAPTURE_WINDOW=<start>/<end>` enables one explicit UTC
+window. Both timestamps use ISO format ending in `Z`. The window lasts at most
+60 seconds and starts within 30 minutes. Unset, invalid, and expired windows
+leave database construction unchanged. An expired window stays inactive after a
+restart; remove the setting after the investigation.
+
+The diagnostic measures awaited Postgres.js `unsafe` responses before Drizzle
+column decoding. It retains the Drizzle builder caller for normal, prepared,
+transaction, and dedicated-pool execution. It issues no queries.
+It logs the public server caller locations, static schema table, operation,
+query/row counts, and response value sizes. It emits at most 128 aggregate
+groups and a summary at the deadline. It never logs SQL, parameters, result
+values, connection strings, or query errors. In-flight queries continue normally.
+
+Look for `paperclip.db_response_capture.entry.v1` and
+`paperclip.db_response_capture.summary.v1` in the process logs. Tagged raw-driver calls, streams, unawaited raw-driver
+dispatch, and protocol overhead are not measured. Relational queries use a driver-level caller fallback.
+Queries still in flight at the deadline are reported separately. Sizes describe
+driver values before column decoding, not billed network bytes. Complex parsed
+values use JSON size estimates, counted in `estimatedValues`. Reconcile them with
+provider metering and socket measurements. Serialization adds temporary CPU and memory work;
+measure the final transfer rate after the window expires.
+
 ### Push the schema
 
 ```sh
